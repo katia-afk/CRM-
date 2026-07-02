@@ -467,6 +467,7 @@ function seedData() {
     tags, linkedin: opts.linkedin || '', email: opts.email || '', due: opts.due || ''
   });
   return {
+    v: 2,
     columns: [
       {
         id: 'col-intros', title: '🤝 Intros Made — waiting to connect', color: '#4f46e5',
@@ -541,7 +542,15 @@ function seedData() {
         ]
       },
       {
-        id: 'col-expired', title: '⏰ Expired — retry directly?', color: '#9aa1ad',
+        id: 'col-negotiation', title: '💰 Negotiation', color: '#db2777',
+        cards: []
+      },
+      {
+        id: 'col-won', title: '✅ Closed Won', color: '#059669',
+        cards: []
+      },
+      {
+        id: 'col-expired', title: '❌ Closed Lost', color: '#9aa1ad',
         cards: [
           L('Cat Middleton', 'The Venture Collective', 'Intro window expired. Consider a direct approach.', []),
           L('Ilana Habib', 'Cintrifuse Capital', 'Intro window expired. Consider a direct approach.', []),
@@ -550,21 +559,46 @@ function seedData() {
           L('Christian', '', 'Intro window expired.', []),
           L('Adem', '', 'Intro window expired (older).', []),
         ]
-      },
-      {
-        id: 'col-won', title: '✅ Committed / Closed', color: '#059669',
-        cards: []
       }
     ]
   };
 }
 
 /* ---------------- State ---------------- */
+// Upgrades boards saved under an older schema. Idempotent — safe to run on
+// every load and on every remote state received from a teammate.
+function migrate(s) {
+  if (!s || !Array.isArray(s.columns)) return s;
+  if ((s.v || 1) < 2) {
+    const renames = {
+      '⏰ Expired — retry directly?': ['❌ Closed Lost', '#9aa1ad'],
+      '✅ Committed / Closed': ['✅ Closed Won', '#059669'],
+    };
+    for (const col of s.columns) {
+      const r = renames[col.title];
+      if (r) { col.title = r[0]; col.color = r[1]; }
+    }
+    if (!s.columns.some(c => c.id === 'col-negotiation')) {
+      const idx = s.columns.findIndex(c => c.id === 'col-won');
+      s.columns.splice(idx === -1 ? s.columns.length : idx, 0,
+        { id: 'col-negotiation', title: '💰 Negotiation', color: '#db2777', cards: [] });
+    }
+    const li = s.columns.findIndex(c => c.id === 'col-expired');
+    if (li !== -1 && li !== s.columns.length - 1) s.columns.push(s.columns.splice(li, 1)[0]);
+    s.v = 2;
+  }
+  return s;
+}
+
 let state = load();
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const s = migrate(JSON.parse(raw));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      return s;
+    }
   } catch (e) { console.warn('Could not load saved data', e); }
   const s = seedData();
   persist(s);
@@ -954,6 +988,7 @@ async function pullState() {
 }
 function applyRemote(data) {
   if (!data || !Array.isArray(data.columns)) return;
+  data = migrate(data);
   if (overlay.classList.contains('open') || document.querySelector('.card.dragging')) {
     pendingRemote = data;
     return;

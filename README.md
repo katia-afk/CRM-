@@ -6,12 +6,13 @@ Everything lives in one file: **`index.html`** — no server, no accounts, no de
 ## How to use it
 
 1. Open `index.html` in any browser (double-click it, or serve it from GitHub Pages).
-2. The board comes pre-loaded with all current leads across five stages:
+2. The board comes pre-loaded with all current leads across six stages:
    - 🤝 **Intros Made** — both sides accepted, waiting to connect
    - 📤 **Pending Outreach** — contacted, awaiting reply
    - 🎯 **Direct Outreach** — not in network, reach out yourself
-   - ⏰ **Expired** — intro window closed, consider retrying directly
-   - ✅ **Committed / Closed** — drag wins here
+   - 💰 **Negotiation** — active deal conversations
+   - ✅ **Closed Won** — committed
+   - ❌ **Closed Lost** — passed, or the intro window expired
 
 ## Features
 
