@@ -1,0 +1,36 @@
+# Katia's Fundraising CRM
+
+A personal, zero-install CRM for tracking fundraising leads as a visual pipeline.
+Everything lives in one file: **`index.html`** — no server, no accounts, no dependencies.
+
+## How to use it
+
+1. Open `index.html` in any browser (double-click it, or serve it from GitHub Pages).
+2. The board comes pre-loaded with all current leads across five stages:
+   - 🤝 **Intros Made** — both sides accepted, waiting to connect
+   - 📤 **Pending Outreach** — contacted, awaiting reply
+   - 🎯 **Direct Outreach** — not in network, reach out yourself
+   - ⏰ **Expired** — intro window closed, consider retrying directly
+   - ✅ **Committed / Closed** — drag wins here
+
+## Features
+
+- **Drag & drop** cards between stages (and reorder within a stage).
+- **Click any card** to edit: name, fund, email, LinkedIn URL, tags, notes, next-action date.
+- **LinkedIn on every card** — if you've saved a profile URL it opens directly; if not,
+  the "Find on LI" button runs a LinkedIn people search for that name + fund so you can
+  grab the real URL and paste it in.
+- **Email button** — appears once you add an email; click to compose (mailto).
+- **Next-action dates** show on cards and turn red when overdue.
+- **Tags** — free-form; `hot`, `warm`, and `booked` get automatic colors.
+- **Search** across names, funds, notes, and tags.
+- **Rename stages** inline, delete them, or add new ones with "+ Add stage".
+- **Auto-saved** to your browser's localStorage on every change.
+- **Export / Import** — download all data as JSON (do this occasionally as a backup,
+  or to move the board to another browser/computer).
+
+## Notes
+
+- Data is stored per-browser. If you open the file on a different machine or clear
+  browsing data, use **Export** on the old one and **Import** on the new one.
+- The seed data only loads the first time; after that, your saved board always wins.

@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Katia's Fundraising CRM</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --ink: #1a1d23;
+    --ink-soft: #5c6370;
+    --ink-faint: #9aa1ad;
+    --line: #e3e6ea;
+    --accent: #4f46e5;
+    --accent-soft: #eef0fe;
+    --hot: #dc2626;
+    --hot-bg: #fdeaea;
+    --warm: #d97706;
+    --warm-bg: #fdf3e3;
+    --cool: #2563eb;
+    --cool-bg: #e8f0fd;
+    --done: #059669;
+    --done-bg: #e6f5ef;
+    --shadow: 0 1px 3px rgba(20, 24, 33, .08), 0 4px 14px rgba(20, 24, 33, .05);
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  .search-wrap { flex: 1; min-width: 180px; max-width: 360px; position: relative; }
+  .search-wrap input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13.5px;
+    background: var(--bg);
+    outline: none;
+  }
+  .search-wrap input:focus { border-color: var(--accent); background: #fff; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--ink-faint); }
+  .header-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #4338ca; }
+  .btn.ghost { border-color: transparent; color: var(--ink-soft); }
+  .btn.ghost:hover { background: var(--bg); color: var(--ink); }
+  .btn.danger { color: var(--hot); }
+
+  /* ---------- Board ---------- */
+  #board {
+    flex: 1;
+    display: flex;
+    gap: 14px;
+    padding: 18px 20px 24px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: flex-start;
+  }
+  .column {
+    background: #ebedf0;
+    border-radius: var(--radius);
+    width: 320px;
+    min-width: 320px;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-top: 4px solid var(--col-color, var(--accent));
+  }
+  .column.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .col-head {
+    padding: 12px 14px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .col-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    outline: none;
+    border-radius: 6px;
+    padding: 3px 6px;
+    min-width: 0;
+  }
+  .col-title:focus { background: #fff; box-shadow: 0 0 0 2px var(--accent-soft); }
+  .col-count {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    background: rgba(255,255,255,.7);
+    border-radius: 99px;
+    padding: 2px 9px;
+  }
+  .col-menu-btn {
+    border: none; background: transparent; cursor: pointer;
+    color: var(--ink-faint); font-size: 16px; line-height: 1;
+    padding: 4px 6px; border-radius: 6px;
+  }
+  .col-menu-btn:hover { background: rgba(255,255,255,.8); color: var(--ink); }
+  .col-cards {
+    padding: 4px 10px 10px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 60px;
+  }
+  .col-foot { padding: 0 10px 12px; }
+  .add-card-btn {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .add-card-btn:hover { background: rgba(255,255,255,.8); color: var(--ink); }
+  #add-col-btn {
+    min-width: 260px;
+    height: 46px;
+    border: 2px dashed var(--line);
+    background: transparent;
+    border-radius: var(--radius);
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #add-col-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- Card ---------- */
+  .card {
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 10px 12px;
+    cursor: grab;
+    border: 1px solid transparent;
+    transition: border-color .15s, transform .1s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card.dragging { opacity: .45; transform: rotate(1.5deg); }
+  .card-top { display: flex; align-items: flex-start; gap: 8px; }
+  .card-name { font-size: 13.5px; font-weight: 700; flex: 1; line-height: 1.3; }
+  .card-company { font-size: 12px; color: var(--ink-soft); margin-top: 2px; line-height: 1.35; }
+  .card-note {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 7px;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: pre-line;
+  }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    letter-spacing: .02em;
+  }
+  .tag.hot { background: var(--hot-bg); color: var(--hot); }
+  .tag.warm { background: var(--warm-bg); color: var(--warm); }
+  .tag.meeting, .tag.booked, .tag.done { background: var(--done-bg); color: var(--done); }
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .icon-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    transition: all .15s;
+  }
+  .icon-link svg { width: 12px; height: 12px; }
+  .icon-link.li { color: #0a66c2; border-color: #cfe0f0; }
+  .icon-link.li:hover { background: #eaf3fb; }
+  .icon-link.li.search-only { color: var(--ink-faint); border-style: dashed; border-color: var(--line); }
+  .icon-link.li.search-only:hover { color: #0a66c2; background: #eaf3fb; }
+  .icon-link.mail { color: var(--done); border-color: #c5e8da; }
+  .icon-link.mail:hover { background: var(--done-bg); }
+  .icon-link.mail.none { color: var(--ink-faint); border-style: dashed; cursor: pointer; }
+  .card-due {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--warm);
+    background: var(--warm-bg);
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .card-due.overdue { color: var(--hot); background: var(--hot-bg); }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 18, 25, .45);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 6vh 16px;
+    z-index: 100;
+    overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 24px 60px rgba(15, 18, 25, .25);
+    padding: 22px 24px;
+  }
+  .modal h2 { font-size: 16px; margin-bottom: 16px; }
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+  .field input, .field textarea, .field select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+    color: var(--ink);
+  }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field textarea { resize: vertical; min-height: 74px; line-height: 1.45; }
+  .field .hint { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
+  .field-row { display: flex; gap: 12px; }
+  .field-row .field { flex: 1; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-actions .spacer { flex: 1; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--ink); color: #fff; font-size: 13px; font-weight: 600;
+    padding: 10px 18px; border-radius: 99px; opacity: 0;
+    transition: all .25s ease; z-index: 200; pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  ::-webkit-scrollbar { height: 10px; width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #c9cdd4; border-radius: 99px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Katia's <span>Fundraising CRM</span></h1>
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" type="text" placeholder="Search name, fund, notes, tags…">
+  </div>
+  <div class="header-actions">
+    <button class="btn primary" onclick="openCardModal()">+ Add Lead</button>
+    <button class="btn" onclick="exportData()">Export</button>
+    <button class="btn" onclick="document.getElementById('import-file').click()">Import</button>
+    <input id="import-file" type="file" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</header>
+
+<div id="board"></div>
+
+<!-- Card modal -->
+<div class="overlay" id="card-overlay">
+  <div class="modal">
+    <h2 id="card-modal-title">Add Lead</h2>
+    <input type="hidden" id="f-id">
+    <div class="field-row">
+      <div class="field">
+        <label>Name *</label>
+        <input id="f-name" type="text" placeholder="Jane Doe">
+      </div>
+      <div class="field">
+        <label>Fund / Company</label>
+        <input id="f-company" type="text" placeholder="Acme Ventures">
+      </div>
+    </div>
+    <div class="field">
+      <label>LinkedIn URL</label>
+      <input id="f-linkedin" type="url" placeholder="https://www.linkedin.com/in/…">
+      <div class="hint">Leave blank to get a one-click LinkedIn people search from the card instead.</div>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="f-email" type="email" placeholder="jane@acme.vc">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Stage</label>
+        <select id="f-column"></select>
+      </div>
+      <div class="field">
+        <label>Next action date</label>
+        <input id="f-due" type="date">
+      </div>
+    </div>
+    <div class="field">
+      <label>Tags <span style="font-weight:400;text-transform:none">(comma-separated — “hot”, “warm”, “booked” get colors)</span></label>
+      <input id="f-tags" type="text" placeholder="hot, family office, LATAM">
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="f-notes" placeholder="Where things stand, follow-ups, context…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost danger" id="f-delete" onclick="deleteCard()">Delete</button>
+      <div class="spacer"></div>
+      <button class="btn" onclick="closeCardModal()">Cancel</button>
+      <button class="btn primary" onclick="saveCard()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const STORAGE_KEY = 'katia-crm-v1';
+
+/* ---------------- Seed data ---------------- */
+function uid() { return 'c' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36); }
+
+function seedData() {
+  const L = (name, company, notes, tags = [], opts = {}) => ({
+    id: uid(), name, company, notes,
+    tags, linkedin: opts.linkedin || '', email: opts.email || '', due: opts.due || ''
+  });
+  return {
+    columns: [
+      {
+        id: 'col-intros', title: '🤝 Intros Made — waiting to connect', color: '#4f46e5',
+        cards: [
+          L('Simmone Seymour', 'Capitalize VC', 'She replied and is keen — shared her scheduling link. Book time!', ['hot']),
+          L('Eduardo Küpper', 'Airborne Ventures (Brazil)', 'Shared my cal.com and he booked time.', ['booked', 'LATAM']),
+          L('Ferdinand Mühlhäuser', 'Founder Institute Germany', 'Meeting booked: Fri Jul 3, 12:30 PM Berlin — IRL at Pomodorino.', ['booked', 'DACH'], { due: '2026-07-03' }),
+          L('Katrin de Haën', 'The Fourth Effect', 'Call done Jul 1. Two follow-ups pending:\n1) She checks with co-founder on investment club pitch\n2) Cheryl Kellond intro', ['warm', 'follow-up'], { due: '2026-07-08' }),
+          L('Ali Mackani', 'Pitch Protocol / Growth Factory', 'He replied and pitched Pitch Protocol — thread is live.', ['warm']),
+          L('Daniel Ospina', 'Pygma / Farfala (LATAM)', 'Intro made, shared my cal.com. Waiting for him to book.', ['LATAM']),
+          L('Linda Hong Cheng', 'Lychee Labs', 'Call Jul 2 at 10 AM.', ['booked'], { due: '2026-07-02' }),
+          L('Mark Dewey', 'Catalyst House Capital / Inyo National Holdings', 'Intro made, no reply yet.', []),
+          L('Sanjay Enishetty', 'ScaleMe Network', 'Intro made, no reply yet.', []),
+          L('Sairee Chahal', 'SHEROES / Young Partners', 'Intro made, no reply yet.', []),
+        ]
+      },
+      {
+        id: 'col-pending', title: '📤 Pending Outreach — awaiting reply', color: '#d97706',
+        cards: [
+          L('Maxwell / Aaron Easaw', 'Dallas family office', 'Writes $500K–$15M checks. Just accepted the intro — strike while warm.', ['hot', 'family office']),
+          L('Shane Sabine', 'Punch Capital', 'Immigrant founder thesis, $100K checks. Just accepted the intro.', ['hot']),
+          L('Blerina Sanocki', 'TideBorn Capital', 'Immigrant founder focus. On pause until Jul 6 — ping then.', ['warm'], { due: '2026-07-06' }),
+          L('Trey Taylor', 'Threadneedle (family office, Atlanta)', '~$100M AUM family office.', ['family office']),
+          L('Sameer Kero', 'Flexedge / RVA Capital (Chicago)', 'Ex-Credit Suisse.', []),
+          L('Iñaki Pedroarena-Leal', 'ex-a16z / Bernstein family office network', 'LATAM network.', ['family office', 'LATAM']),
+          L('Alejandro Gálvez', '99 Startups (Mexico City)', '60+ angel investments.', ['LATAM', 'angel']),
+          L('Maria', 'TozziniFreire', 'Brazilian M&A lawyer / angel.', ['LATAM', 'angel']),
+          L('Tonya Long', 'Daymaker Ventures (SF)', 'AI angel.', ['angel', 'AI']),
+          L('Lise', 'BKR Capital (Canada)', 'Earlier intro window expired — re-proposed.', []),
+          L('Stefanie Thomas Martin', 'Zeal Capital (DC)', 'Backs underrepresented founders.', []),
+          L('Raphael Roettgen', 'E2MC Ventures', 'Space / deep tech.', ['deep tech']),
+          L('Matt McKibbin', 'DecentraNet', '$50M+ deployed.', []),
+          L('J.D. Smith', 'LvlUp Ventures', 'Crypto / Draper-adjacent.', ['crypto']),
+          L('Mark Sherman', 'Titanium Ventures (SF)', '18 unicorns in portfolio.', ['hot']),
+          L('Pete Hopton', 'Atuin.Ventures (UK)', '', []),
+          L('Ludolf von Schöning', 'Paloneo / Republic', 'European family offices.', ['family office', 'EU']),
+          L('Otto Eberdorfer', 'Superotto Ventures', 'DACH region.', ['DACH']),
+          L('Raphael Budday', 'Venture Stars (Munich)', '', ['DACH']),
+          L('Javier D. Caruso', 'Webstarted / 500 Global LATAM', '', ['LATAM']),
+          L('Jason Kraus', 'Prepare 4 VC / EQx Fund', '', []),
+          L('Eric Van der Kleij', 'EdenBase Fund 2', 'Ex-Level39. Earlier intro window expired — re-proposed.', ['EU']),
+          L('A.J. Noronha', 'GX Ventures (Chicago)', '', []),
+          L('Ashley Vickers', 'Cain & Co', '$1.25B+ raised.', []),
+          L('Syama Bunten', 'Big Delta Capital (SF)', 'Women’s wealth focus.', []),
+          L('Angie Wang', 'VU Venture Partners', 'Cross-border AI.', ['AI']),
+          L('Julian Nachtigal', 'ex-PARISOMA', 'SF founder ecosystem.', []),
+          L('Vittorio Sommella', 'Play Global Solutions', 'Cross-border.', []),
+          L('John Sechrest', 'Mossy Ventures / Transatlantic Angel Conference', '', ['angel']),
+          L('Isabelle Kent', 'Startup Leaders', 'Cross-border.', []),
+          L('Juan Carlos Pacheco', 'IDEA Fund Partners', 'Southeast US.', []),
+          L('Ryan M.', 'Stiltsville Capital (Florida)', '', []),
+          L('Jacob Sudhoff', 'Houston', '600+ family office conversations.', ['family office']),
+          L('Raphael Kaiser', 'EWOR / 10x Founders (Munich)', '', ['DACH']),
+          L('Rodrigo Baer', '14B Venture Capital (Brazil)', '6 unicorns.', ['LATAM', 'hot']),
+          L('Damian Madray', 'Glint Worlds / Numinous (SF)', 'Human potential focus. Earlier intro window expired — re-proposed.', []),
+          L('Markus Pesonen', 'Olo (SF)', 'Wellness / Burning Man-adjacent.', []),
+          L('Zhen Cao', 'Republic (SF)', 'Community / crypto angel.', ['crypto', 'angel']),
+          L('Christian O. Edler', 'Berlin angel', '~100 companies backed. Earlier intro window expired — re-proposed.', ['angel', 'DACH']),
+          L('Lauren Weiniger', 'Harvest Venture Partners', 'Family office network.', ['family office']),
+          L('Irene Wu', 'ex-LayerZero / Bain Capital Crypto', 'Angel.', ['crypto', 'angel']),
+          L('Marco Podesta', 'empla.io', 'Multi-exit European founder. Pending his response.', ['EU']),
+        ]
+      },
+      {
+        id: 'col-direct', title: '🎯 Direct Outreach — not in network', color: '#0891b2',
+        cards: [
+          L('Charlie Songhurst', '', 'Reach out directly on LinkedIn.', ['to-do']),
+          L('Gabriel Vasquez', 'a16z', 'Already messaged him — waiting for reply.', []),
+          L('Raj & Sunny Singh Sandhu', 'Vicus Ventures', 'Direct LinkedIn message recommended.', ['to-do']),
+          L('Joshua Hengl', '', 'Already talking to him today.', ['warm'], { due: '2026-07-02' }),
+          L('Cheryl Kellond', 'Play Money', 'Waiting on Katrin de Haën’s intro first.', ['waiting']),
+        ]
+      },
+      {
+        id: 'col-expired', title: '⏰ Expired — retry directly?', color: '#9aa1ad',
+        cards: [
+          L('Cat Middleton', 'The Venture Collective', 'Intro window expired. Consider a direct approach.', []),
+          L('Ilana Habib', 'Cintrifuse Capital', 'Intro window expired. Consider a direct approach.', []),
+          L('Mark', '', 'Intro window expired.', []),
+          L('Markus', '', 'Intro window expired.', []),
+          L('Christian', '', 'Intro window expired.', []),
+          L('Adem', '', 'Intro window expired (older).', []),
+        ]
+      },
+      {
+        id: 'col-won', title: '✅ Committed / Closed', color: '#059669',
+        cards: []
+      }
+    ]
+  };
+}
+
+/* ---------------- State ---------------- */
+let state = load();
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.warn('Could not load saved data', e); }
+  const s = seedData();
+  persist(s);
+  return s;
+}
+function persist(s = state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+}
+
+function findCard(id) {
+  for (const col of state.columns) {
+    const i = col.cards.findIndex(c => c.id === id);
+    if (i !== -1) return { col, index: i, card: col.cards[i] };
+  }
+  return null;
+}
+
+/* ---------------- Rendering ---------------- */
+const board = document.getElementById('board');
+let filter = '';
+
+function linkedInHref(card) {
+  if (card.linkedin) return card.linkedin;
+  const q = encodeURIComponent([card.name, card.company].filter(Boolean).join(' '));
+  return 'https://www.linkedin.com/search/results/people/?keywords=' + q;
+}
+
+function matchesFilter(card) {
+  if (!filter) return true;
+  const hay = [card.name, card.company, card.notes, (card.tags || []).join(' ')].join(' ').toLowerCase();
+  return hay.includes(filter);
+}
+
+function tagClass(t) {
+  const k = t.toLowerCase();
+  if (k === 'hot') return 'tag hot';
+  if (k === 'warm') return 'tag warm';
+  if (['booked', 'meeting', 'done', 'won'].includes(k)) return 'tag done';
+  return 'tag';
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+function fmtDue(due) {
+  const d = new Date(due + 'T00:00:00');
+  if (isNaN(d)) return due;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function render() {
+  board.innerHTML = '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  for (const col of state.columns) {
+    const visible = col.cards.filter(matchesFilter);
+
+    const colEl = document.createElement('div');
+    colEl.className = 'column';
+    colEl.dataset.colId = col.id;
+    colEl.style.setProperty('--col-color', col.color || '#4f46e5');
+
+    // Header
+    const head = document.createElement('div');
+    head.className = 'col-head';
+    const title = document.createElement('input');
+    title.className = 'col-title';
+    title.value = col.title;
+    title.title = 'Click to rename this stage';
+    title.addEventListener('change', () => { col.title = title.value.trim() || col.title; persist(); });
+    title.addEventListener('keydown', e => { if (e.key === 'Enter') title.blur(); });
+    const count = document.createElement('span');
+    count.className = 'col-count';
+    count.textContent = filter ? visible.length + '/' + col.cards.length : col.cards.length;
+    const del = document.createElement('button');
+    del.className = 'col-menu-btn';
+    del.innerHTML = '✕';
+    del.title = 'Delete this stage';
+    del.onclick = () => {
+      if (col.cards.length && !confirm('Delete "' + col.title + '" and its ' + col.cards.length + ' lead(s)?')) return;
+      state.columns = state.columns.filter(c => c.id !== col.id);
+      persist(); render();
+    };
+    head.append(title, count, del);
+
+    // Cards container (drop target)
+    const list = document.createElement('div');
+    list.className = 'col-cards';
+    list.addEventListener('dragover', e => { e.preventDefault(); colEl.classList.add('drag-over'); });
+    list.addEventListener('dragleave', () => colEl.classList.remove('drag-over'));
+    list.addEventListener('drop', e => {
+      e.preventDefault();
+      colEl.classList.remove('drag-over');
+      const cardId = e.dataTransfer.getData('text/plain');
+      const found = findCard(cardId);
+      if (!found) return;
+      found.col.cards.splice(found.index, 1);
+      // insert relative to nearest card under pointer
+      const after = [...list.querySelectorAll('.card:not(.dragging)')].find(el =>
+        e.clientY < el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2);
+      if (after) {
+        const idx = col.cards.findIndex(c => c.id === after.dataset.cardId);
+        col.cards.splice(Math.max(idx, 0), 0, found.card);
+      } else {
+        col.cards.push(found.card);
+      }
+      persist(); render();
+    });
+
+    for (const card of visible) {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.draggable = true;
+      el.dataset.cardId = card.id;
+      el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', card.id);
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => el.classList.add('dragging'));
+      });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+      el.addEventListener('click', e => {
+        if (e.target.closest('a')) return; // let links work
+        openCardModal(card.id);
+      });
+
+      const hasLi = !!card.linkedin;
+      const liSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45z"/></svg>';
+      const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
+
+      let dueHtml = '';
+      if (card.due) {
+        const d = new Date(card.due + 'T00:00:00');
+        const overdue = !isNaN(d) && d < today;
+        dueHtml = '<span class="card-due' + (overdue ? ' overdue' : '') + '">⏰ ' + esc(fmtDue(card.due)) + '</span>';
+      }
+
+      el.innerHTML =
+        '<div class="card-top"><div style="flex:1;min-width:0">' +
+          '<div class="card-name">' + esc(card.name) + '</div>' +
+          (card.company ? '<div class="card-company">' + esc(card.company) + '</div>' : '') +
+        '</div></div>' +
+        (card.notes ? '<div class="card-note">' + esc(card.notes) + '</div>' : '') +
+        ((card.tags || []).length ? '<div class="card-tags">' + card.tags.map(t => '<span class="' + tagClass(t) + '">' + esc(t) + '</span>').join('') + '</div>' : '') +
+        '<div class="card-footer">' +
+          '<a class="icon-link li' + (hasLi ? '' : ' search-only') + '" href="' + esc(linkedInHref(card)) + '" target="_blank" rel="noopener" title="' + (hasLi ? 'Open LinkedIn profile' : 'No profile saved yet — search LinkedIn') + '">' + liSvg + (hasLi ? 'LinkedIn' : 'Find on LI') + '</a>' +
+          (card.email
+            ? '<a class="icon-link mail" href="mailto:' + esc(card.email) + '" title="' + esc(card.email) + '">' + mailSvg + 'Email</a>'
+            : '<span class="icon-link mail none" title="No email yet — click card to add">' + mailSvg + '—</span>') +
+          dueHtml +
+        '</div>';
+
+      list.appendChild(el);
+    }
+
+    // Footer
+    const foot = document.createElement('div');
+    foot.className = 'col-foot';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-card-btn';
+    addBtn.textContent = '+ Add lead';
+    addBtn.onclick = () => openCardModal(null, col.id);
+    foot.appendChild(addBtn);
+
+    colEl.append(head, list, foot);
+    board.appendChild(colEl);
+  }
+
+  // Add-column button
+  const addCol = document.createElement('button');
+  addCol.id = 'add-col-btn';
+  addCol.textContent = '+ Add stage';
+  addCol.onclick = () => {
+    const name = prompt('Name for the new stage:');
+    if (!name) return;
+    state.columns.push({ id: uid(), title: name, color: '#4f46e5', cards: [] });
+    persist(); render();
+  };
+  board.appendChild(addCol);
+}
+
+/* ---------------- Card modal ---------------- */
+const overlay = document.getElementById('card-overlay');
+let editingId = null;
+
+function openCardModal(cardId = null, defaultColId = null) {
+  editingId = cardId;
+  const sel = document.getElementById('f-column');
+  sel.innerHTML = state.columns.map(c => '<option value="' + c.id + '">' + esc(c.title) + '</option>').join('');
+
+  if (cardId) {
+    const found = findCard(cardId);
+    if (!found) return;
+    const c = found.card;
+    document.getElementById('card-modal-title').textContent = 'Edit Lead';
+    document.getElementById('f-id').value = c.id;
+    document.getElementById('f-name').value = c.name || '';
+    document.getElementById('f-company').value = c.company || '';
+    document.getElementById('f-linkedin').value = c.linkedin || '';
+    document.getElementById('f-email').value = c.email || '';
+    document.getElementById('f-due').value = c.due || '';
+    document.getElementById('f-tags').value = (c.tags || []).join(', ');
+    document.getElementById('f-notes').value = c.notes || '';
+    sel.value = found.col.id;
+    document.getElementById('f-delete').style.display = '';
+  } else {
+    document.getElementById('card-modal-title').textContent = 'Add Lead';
+    ['f-id', 'f-name', 'f-company', 'f-linkedin', 'f-email', 'f-due', 'f-tags', 'f-notes'].forEach(id => document.getElementById(id).value = '');
+    if (defaultColId) sel.value = defaultColId;
+    document.getElementById('f-delete').style.display = 'none';
+  }
+  overlay.classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+function closeCardModal() { overlay.classList.remove('open'); editingId = null; }
+overlay.addEventListener('click', e => { if (e.target === overlay) closeCardModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCardModal(); });
+
+function saveCard() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { toast('Name is required'); return; }
+  const data = {
+    name,
+    company: document.getElementById('f-company').value.trim(),
+    linkedin: document.getElementById('f-linkedin').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    due: document.getElementById('f-due').value,
+    tags: document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+    notes: document.getElementById('f-notes').value.trim(),
+  };
+  const targetColId = document.getElementById('f-column').value;
+  const targetCol = state.columns.find(c => c.id === targetColId) || state.columns[0];
+
+  if (editingId) {
+    const found = findCard(editingId);
+    if (found) {
+      Object.assign(found.card, data);
+      if (found.col.id !== targetCol.id) {
+        found.col.cards.splice(found.index, 1);
+        targetCol.cards.unshift(found.card);
+      }
+    }
+  } else {
+    targetCol.cards.unshift({ id: uid(), ...data });
+  }
+  persist(); render(); closeCardModal();
+  toast('Saved');
+}
+
+function deleteCard() {
+  if (!editingId) return;
+  const found = findCard(editingId);
+  if (found && confirm('Delete ' + found.card.name + '?')) {
+    found.col.cards.splice(found.index, 1);
+    persist(); render(); closeCardModal();
+    toast('Deleted');
+  }
+}
+
+/* ---------------- Search ---------------- */
+document.getElementById('search').addEventListener('input', e => {
+  filter = e.target.value.trim().toLowerCase();
+  render();
+});
+
+/* ---------------- Export / Import ---------------- */
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'katia-crm-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Exported — keep this as a backup');
+}
+function importData(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.columns)) throw new Error('bad format');
+      state = data;
+      persist(); render();
+      toast('Imported ' + data.columns.reduce((n, c) => n + c.cards.length, 0) + ' leads');
+    } catch (e) { toast('Could not read that file'); }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+}
+
+/* ---------------- Toast ---------------- */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+render();
+</script>
+</body>
+</html>
