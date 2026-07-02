@@ -210,6 +210,8 @@
   .tag.hot { background: var(--hot-bg); color: var(--hot); }
   .tag.warm { background: var(--warm-bg); color: var(--warm); }
   .tag.meeting, .tag.booked, .tag.done { background: var(--done-bg); color: var(--done); }
+  .tag.pitch-fr { background: #f3e8ff; color: #7c3aed; }
+  .tag.pitch-bh { background: #e0f2f1; color: #0f766e; }
   .card-footer {
     display: flex;
     align-items: center;
@@ -293,6 +295,20 @@
   .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
   .modal-actions .spacer { flex: 1; }
 
+  /* ---------- Sync / share ---------- */
+  .sync-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); }
+  .sync-dot.on { background: var(--done); }
+  .sync-dot.err { background: var(--hot); }
+  .check-row { display: flex; gap: 18px; padding: 4px 0; flex-wrap: wrap; }
+  .check-row .chk { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .check-row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); }
+  .share-steps { margin: 12px 0 16px 18px; font-size: 13px; color: var(--ink-soft); line-height: 1.8; }
+  .share-steps a { color: var(--accent); }
+  .copy-box { display: flex; gap: 8px; }
+  .copy-box input { flex: 1; }
+  .btn.tiny { padding: 2px 9px; font-size: 11px; border-radius: 6px; }
+
   /* ---------- Toast ---------- */
   #toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
@@ -316,7 +332,9 @@
     <input id="search" type="text" placeholder="Search name, fund, notes, tags…">
   </div>
   <div class="header-actions">
+    <span class="sync-status" id="sync-status" style="display:none"><span class="sync-dot" id="sync-dot"></span><span id="sync-label"></span></span>
     <button class="btn primary" onclick="openCardModal()">+ Add Lead</button>
+    <button class="btn" onclick="openShareModal()">Share</button>
     <button class="btn" onclick="exportData()">Export</button>
     <button class="btn" onclick="document.getElementById('import-file').click()">Import</button>
     <input id="import-file" type="file" accept=".json" style="display:none" onchange="importData(event)">
@@ -364,6 +382,13 @@
       <input id="f-tags" type="text" placeholder="hot, family office, LATAM">
     </div>
     <div class="field">
+      <label>Pitch for</label>
+      <div class="check-row">
+        <label class="chk"><input type="checkbox" id="f-pitch-fr"> Frontier Residency</label>
+        <label class="chk"><input type="checkbox" id="f-pitch-bh"> BerlinHouse</label>
+      </div>
+    </div>
+    <div class="field">
       <label>Notes</label>
       <textarea id="f-notes" placeholder="Where things stand, follow-ups, context…"></textarea>
     </div>
@@ -376,11 +401,62 @@
   </div>
 </div>
 
+<!-- Share modal -->
+<div class="overlay" id="share-overlay">
+  <div class="modal">
+    <h2>Share this board</h2>
+    <div id="share-disconnected">
+      <p style="font-size:13px;color:var(--ink-soft);line-height:1.55">Connect a free database that you own, and everyone with your invite link works on the same live board.</p>
+      <ol class="share-steps">
+        <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> (any name works)</li>
+        <li>Open its <b>SQL Editor</b>, paste the setup script, hit Run &nbsp;<button class="btn tiny" onclick="copySql()">Copy setup SQL</button></li>
+        <li>In <b>Settings → API</b>, copy the Project URL and <b>anon public</b> key into the fields below</li>
+      </ol>
+      <div class="field">
+        <label>Supabase project URL</label>
+        <input id="s-url" type="url" placeholder="https://abcdefgh.supabase.co">
+      </div>
+      <div class="field">
+        <label>Anon public key</label>
+        <input id="s-key" type="text" placeholder="eyJhbGciOi…">
+      </div>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button class="btn" onclick="closeShareModal()">Cancel</button>
+        <button class="btn primary" onclick="connectShared()">Create shared board</button>
+      </div>
+    </div>
+    <div id="share-connected" style="display:none">
+      <p style="font-size:13px;color:var(--ink-soft);line-height:1.55">✅ This board is shared. Email the invite link below — anyone who opens it joins the same live board, and edits sync within a few seconds.</p>
+      <div class="field" style="margin-top:14px">
+        <label>Invite link</label>
+        <div class="copy-box">
+          <input id="s-invite" type="text" readonly onclick="this.select()">
+          <button class="btn" onclick="copyInvite()">Copy</button>
+        </div>
+        <div class="hint">Anyone with this link can view and edit the board — only share it with your team.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost danger" onclick="disconnectShared()">Disconnect this device</button>
+        <div class="spacer"></div>
+        <button class="btn" onclick="closeShareModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 'use strict';
 const STORAGE_KEY = 'katia-crm-v1';
+
+// shared-board sync state (declared early: persist() below references it)
+let sync = null;          // {url, key, board}
+let rev = 0;              // last revision seen/written
+let pushTimer = null;
+let pollTimer = null;
+let pendingRemote = null; // remote state held back while a modal is open / card is dragging
 
 /* ---------------- Seed data ---------------- */
 function uid() { return 'c' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36); }
@@ -496,6 +572,7 @@ function load() {
 }
 function persist(s = state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  schedulePush();
 }
 
 function findCard(id) {
@@ -518,7 +595,7 @@ function linkedInHref(card) {
 
 function matchesFilter(card) {
   if (!filter) return true;
-  const hay = [card.name, card.company, card.notes, (card.tags || []).join(' ')].join(' ').toLowerCase();
+  const hay = [card.name, card.company, card.notes, (card.tags || []).join(' '), (card.pitch || []).join(' ')].join(' ').toLowerCase();
   return hay.includes(filter);
 }
 
@@ -619,6 +696,10 @@ function render() {
       const liSvg = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45z"/></svg>';
       const mailSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
 
+      const chips =
+        (card.pitch || []).map(p => '<span class="tag ' + (p === 'BerlinHouse' ? 'pitch-bh' : 'pitch-fr') + '">🎤 ' + esc(p) + '</span>').join('') +
+        (card.tags || []).map(t => '<span class="' + tagClass(t) + '">' + esc(t) + '</span>').join('');
+
       let dueHtml = '';
       if (card.due) {
         const d = new Date(card.due + 'T00:00:00');
@@ -632,7 +713,7 @@ function render() {
           (card.company ? '<div class="card-company">' + esc(card.company) + '</div>' : '') +
         '</div></div>' +
         (card.notes ? '<div class="card-note">' + esc(card.notes) + '</div>' : '') +
-        ((card.tags || []).length ? '<div class="card-tags">' + card.tags.map(t => '<span class="' + tagClass(t) + '">' + esc(t) + '</span>').join('') + '</div>' : '') +
+        (chips ? '<div class="card-tags">' + chips + '</div>' : '') +
         '<div class="card-footer">' +
           '<a class="icon-link li' + (hasLi ? '' : ' search-only') + '" href="' + esc(linkedInHref(card)) + '" target="_blank" rel="noopener" title="' + (hasLi ? 'Open LinkedIn profile' : 'No profile saved yet — search LinkedIn') + '">' + liSvg + (hasLi ? 'LinkedIn' : 'Find on LI') + '</a>' +
           (card.email
@@ -691,12 +772,16 @@ function openCardModal(cardId = null, defaultColId = null) {
     document.getElementById('f-email').value = c.email || '';
     document.getElementById('f-due').value = c.due || '';
     document.getElementById('f-tags').value = (c.tags || []).join(', ');
+    document.getElementById('f-pitch-fr').checked = (c.pitch || []).includes('Frontier Residency');
+    document.getElementById('f-pitch-bh').checked = (c.pitch || []).includes('BerlinHouse');
     document.getElementById('f-notes').value = c.notes || '';
     sel.value = found.col.id;
     document.getElementById('f-delete').style.display = '';
   } else {
     document.getElementById('card-modal-title').textContent = 'Add Lead';
     ['f-id', 'f-name', 'f-company', 'f-linkedin', 'f-email', 'f-due', 'f-tags', 'f-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-pitch-fr').checked = false;
+    document.getElementById('f-pitch-bh').checked = false;
     if (defaultColId) sel.value = defaultColId;
     document.getElementById('f-delete').style.display = 'none';
   }
@@ -704,9 +789,16 @@ function openCardModal(cardId = null, defaultColId = null) {
   document.getElementById('f-name').focus();
 }
 
-function closeCardModal() { overlay.classList.remove('open'); editingId = null; }
+function closeCardModal() {
+  overlay.classList.remove('open'); editingId = null;
+  if (pendingRemote) {
+    const d = pendingRemote; pendingRemote = null;
+    // if we just saved (push pending), our version wins; otherwise apply the teammate's update
+    if (!pushTimer) applyRemote(d);
+  }
+}
 overlay.addEventListener('click', e => { if (e.target === overlay) closeCardModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCardModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCardModal(); closeShareModal(); } });
 
 function saveCard() {
   const name = document.getElementById('f-name').value.trim();
@@ -718,6 +810,10 @@ function saveCard() {
     email: document.getElementById('f-email').value.trim(),
     due: document.getElementById('f-due').value,
     tags: document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+    pitch: [
+      ...(document.getElementById('f-pitch-fr').checked ? ['Frontier Residency'] : []),
+      ...(document.getElementById('f-pitch-bh').checked ? ['BerlinHouse'] : []),
+    ],
     notes: document.getElementById('f-notes').value.trim(),
   };
   const targetColId = document.getElementById('f-column').value;
@@ -781,6 +877,166 @@ function importData(ev) {
   reader.readAsText(file);
   ev.target.value = '';
 }
+
+/* ---------------- Shared board sync (Supabase) ----------------
+   The board is stored as one row in a `boards` table the owner creates
+   in their own free Supabase project. Sync is plain REST: debounced
+   whole-board writes guarded by a revision counter (last write wins),
+   plus a 4s poll for teammates' changes. */
+const SYNC_KEY = 'katia-crm-sync';
+const SETUP_SQL = `create table if not exists boards (
+  id uuid primary key,
+  data jsonb not null,
+  rev bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
+alter table boards enable row level security;
+create policy "boards anon select" on boards for select to anon using (true);
+create policy "boards anon insert" on boards for insert to anon with check (true);
+create policy "boards anon update" on boards for update to anon using (true);`;
+
+function restUrl(q) { return sync.url + '/rest/v1/boards' + q; }
+function syncHeaders() {
+  return { 'apikey': sync.key, 'Authorization': 'Bearer ' + sync.key, 'Content-Type': 'application/json' };
+}
+function setSyncStatus(ok) {
+  const wrap = document.getElementById('sync-status');
+  if (!sync) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  document.getElementById('sync-dot').className = 'sync-dot ' + (ok ? 'on' : 'err');
+  document.getElementById('sync-label').textContent = ok ? 'Shared · synced' : 'Shared · offline';
+}
+function schedulePush() {
+  if (!sync) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { pushTimer = null; pushState(); }, 500);
+}
+async function pushState() {
+  if (!sync) return;
+  const newRev = rev + 1;
+  try {
+    // conditional update: only overwrite if the stored rev is older than ours
+    const res = await fetch(restUrl('?id=eq.' + sync.board + '&rev=lt.' + newRev), {
+      method: 'PATCH',
+      headers: { ...syncHeaders(), 'Prefer': 'return=representation' },
+      body: JSON.stringify({ data: state, rev: newRev, updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if ((await res.json()).length) { rev = newRev; setSyncStatus(true); return; }
+    // nothing updated: row doesn't exist yet, or a teammate wrote a newer rev
+    const chk = await fetch(restUrl('?id=eq.' + sync.board + '&select=rev'), { headers: syncHeaders() });
+    if (!chk.ok) throw new Error('HTTP ' + chk.status);
+    if (!(await chk.json()).length) {
+      const ins = await fetch(restUrl(''), {
+        method: 'POST',
+        headers: { ...syncHeaders(), 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ id: sync.board, data: state, rev: newRev })
+      });
+      if (!ins.ok) throw new Error('HTTP ' + ins.status);
+      rev = newRev; setSyncStatus(true);
+    } else {
+      await pullState();
+    }
+  } catch (e) { setSyncStatus(false); }
+}
+async function pullState() {
+  if (!sync) return;
+  try {
+    const res = await fetch(restUrl('?id=eq.' + sync.board + '&select=rev,data'), { headers: syncHeaders() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if (rows.length && rows[0].rev > rev) {
+      rev = rows[0].rev;
+      applyRemote(rows[0].data);
+    }
+    setSyncStatus(true);
+  } catch (e) { setSyncStatus(false); }
+}
+function applyRemote(data) {
+  if (!data || !Array.isArray(data.columns)) return;
+  if (overlay.classList.contains('open') || document.querySelector('.card.dragging')) {
+    pendingRemote = data;
+    return;
+  }
+  state = data;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); // save without re-pushing
+  render();
+}
+function startSync() {
+  setSyncStatus(true);
+  pullState();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!pushTimer) pullState(); }, 4000);
+}
+
+/* ----- Share modal ----- */
+const shareOverlay = document.getElementById('share-overlay');
+function openShareModal() {
+  document.getElementById('share-disconnected').style.display = sync ? 'none' : '';
+  document.getElementById('share-connected').style.display = sync ? '' : 'none';
+  if (sync) document.getElementById('s-invite').value = inviteLink();
+  shareOverlay.classList.add('open');
+}
+function closeShareModal() { shareOverlay.classList.remove('open'); }
+shareOverlay.addEventListener('click', e => { if (e.target === shareOverlay) closeShareModal(); });
+
+function inviteLink() {
+  return location.origin + location.pathname + '#join=' + btoa(JSON.stringify(sync));
+}
+async function connectShared() {
+  const url = document.getElementById('s-url').value.trim().replace(/\/+$/, '');
+  const key = document.getElementById('s-key').value.trim();
+  if (!/^https:\/\/.+/.test(url) || !key) { toast('Enter your Supabase project URL and anon key'); return; }
+  const cfg = { url, key, board: crypto.randomUUID() };
+  try {
+    const res = await fetch(url + '/rest/v1/boards', {
+      method: 'POST',
+      headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ id: cfg.board, data: state, rev: 1 })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch (e) {
+    toast('Could not connect — check the URL, the key, and that the setup SQL was run');
+    return;
+  }
+  sync = cfg; rev = 1;
+  localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+  startSync();
+  openShareModal();
+  toast('Shared board created — send the invite link to your team');
+}
+function disconnectShared() {
+  if (!confirm('Disconnect from the shared board? Your copy stays on this device, but edits will no longer sync.')) return;
+  sync = null; rev = 0;
+  localStorage.removeItem(SYNC_KEY);
+  clearInterval(pollTimer);
+  history.replaceState(null, '', location.pathname + location.search);
+  setSyncStatus(true);
+  openShareModal();
+}
+function copyText(text, msg) {
+  navigator.clipboard.writeText(text).then(() => toast(msg), () => toast('Copy failed — select the text and copy manually'));
+}
+function copyInvite() { copyText(document.getElementById('s-invite').value, 'Invite link copied — email it to your team'); }
+function copySql() { copyText(SETUP_SQL, 'SQL copied — paste it into the Supabase SQL Editor'); }
+
+(function initSync() {
+  const m = location.hash.match(/#join=(.+)/);
+  if (m) {
+    try {
+      const cfg = JSON.parse(atob(decodeURIComponent(m[1])));
+      if (cfg && /^https:\/\//.test(cfg.url) && cfg.key && cfg.board) {
+        sync = cfg;
+        localStorage.setItem(SYNC_KEY, JSON.stringify(sync));
+        toast('Joined the shared board');
+      }
+    } catch (e) { /* malformed invite link — stay local */ }
+  }
+  if (!sync) {
+    try { sync = JSON.parse(localStorage.getItem(SYNC_KEY)); } catch (e) { sync = null; }
+  }
+  if (sync) startSync();
+})();
 
 /* ---------------- Toast ---------------- */
 let toastTimer;
